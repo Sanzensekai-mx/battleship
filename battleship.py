@@ -44,11 +44,10 @@ class Ship:
 class Board:
     def __init__(self, hid=False, board_size=6):
         # self._board_dots = [[Dot(i, j) for j in range(1, board_size + 1)] for i in range(1, board_size + 1)]
-        self._board_dots = [["O"] * board_size for i in range(board_size + 1)]
+        self._board_dots = [["O"] * board_size for i in range(board_size)]
         self.ship_list = [] # объекты Ships
         self.hid = hid
         self.board_size = board_size
-        # self.hid = hid # Тру или фалсе нужно ли скрывать корабли на доске
         self.alive_ships = 0 # Количество живых кораблей на доске
         self.not_empty_dots = []
 
@@ -69,11 +68,11 @@ class Board:
                                             else f"В этой точке уже стоит другой корабль: {dot.x + 1} {dot.y}")
         for dot in ship.dots():
             self._board_dots[dot.x][dot.y] = "■"
-            self.not_empty_dots.append(dot)
+            # self.not_empty_dots.append(dot) # BoardShipException при shoot
         self.ship_list.append(ship)
                 
 
-    def contour(self, ship: Ship):
+    def contour(self, ship: Ship, change_board_layout=False):
         # ship_contour = []
         # Использовать out, not_empty_dots
         for dot in ship.dots():
@@ -85,17 +84,40 @@ class Board:
                     continue
                 if n_dot not in self.not_empty_dots:
                     self.not_empty_dots.append(n_dot)
-                    self._board_dots[n_dot.x][n_dot.y] = 'T'
-            # self._board_dots[dot.x][dot.y + 1] = "T"
-            # self._board_dots[dot.x][dot.y - 1] = "T"
+                    if change_board_layout:
+                        self._board_dots[n_dot.x][n_dot.y] = 'T'
 
-    def shot(self):
-        pass
+    def shot(self, dot):
+        if self.out(dot):
+            raise BoardDotOutException()
+        if dot in self.not_empty_dots:
+            raise BoardShipException()
+        
+        self.not_empty_dots.append(dot)
+        for ship in board.ship_list:
+            if dot in ship.dots():
+                ship.lives -= 1
+                self._board_dots[dot.x][dot.y] = 'X'
+                if ship.lives == 0:
+                    # Корабль уничтожен
+                    self.contour(ship, change_board_layout=True)
+                    return
+                elif ship.lives > 0:
+                    # ранен
+                    return
+        # промах
+        self._board_dots[dot.x][dot.y] = 'T'
+
 
     def __str__(self):
         result = '  |1|2|3|4|5|6|'
         for idx, line in enumerate(self._board_dots, 1):
-            result += f"\n{idx} |{'|'.join(line)}|"
+            line_copy = line.copy()
+            if self.hid:
+                for i, c in enumerate(line_copy):
+                    if c == '■':
+                        line_copy[i] = 'O'
+            result += f"\n{idx} |{'|'.join(line_copy)}|"
         return result
 
 class Player:
@@ -119,7 +141,7 @@ list_dots = [dot2, Dot(0, 5), Dot(5, 3)]
 # print(dot1 == dot2)
 # print(dot1 in list_dots)
 
-board = Board()
+board = Board(hid=True)
 
 # print(board._board_dots)
 
@@ -138,11 +160,15 @@ dot3 = Dot(2, 3)
 ship3 = Ship(length=3, ship_bow=dot3, ship_direction='vertically')
 print(ship3.dots())
 board.add_ship(ship3)
-board.contour(ship3)
+# board.contour(ship3)
 print(board.not_empty_dots)
 
-for row in board._board_dots:
-    print(row)
+# for row in board._board_dots:
+    # print(row)
 # print(board.out(dot3))
-
+board.shot(Dot(1, 3))
+board.shot(Dot(2, 3))
+# print(board.not_empty_dots)
+board.shot(Dot(3, 3))
+board.shot(Dot(4, 3))
 print(board)
