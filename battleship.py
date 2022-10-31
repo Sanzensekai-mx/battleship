@@ -82,6 +82,7 @@ class Board:
             self._board_dots[dot.x][dot.y] = "■"
             # self.not_empty_dots.append(dot) # BoardShipException при shoot
         self.ship_list.append(ship)
+        self.alive_ships += 1
                 
 
     def contour(self, ship: Ship, change_board_layout=False):
@@ -102,20 +103,23 @@ class Board:
     def shot(self, dot):
         if self.out(dot):
             raise BoardDotOutException()
-        if dot in self.not_empty_dots:
-            raise BoardShipException()
+        # if dot in self.not_empty_dots:
+            # raise BoardShipException()
         
         self.not_empty_dots.append(dot)
-        for ship in board.ship_list:
+        for ship in self.ship_list:
             if dot in ship.dots():
                 ship.lives -= 1
                 self._board_dots[dot.x][dot.y] = 'X'
                 if ship.lives == 0:
                     # Корабль уничтожен
                     self.contour(ship, change_board_layout=True)
+                    self.alive_ships -= 1
+                    print('Корабль уничтожен!!!')
                     return True
                 elif ship.lives > 0:
                     # ранен
+                    print('Ранен корабль!')
                     return True
         # промах
         self._board_dots[dot.x][dot.y] = 'T'
@@ -142,19 +146,27 @@ class Player:
         pass # Вернуть Dot объект
 
     def move(self):
-        asked_dot_to_shoot = self.ask()
-        shoot_result = self.enemy_board.shoot(asked_dot_to_shoot)
-        while shoot_result:
-            asked_dot_to_shoot = self.ask()
-            shoot_result = self.enemy_board.shoot(asked_dot_to_shoot)
+        asked_dot_to_shot = self.ask()
+        shot_result = self.enemy_board.shot(asked_dot_to_shot)
+        while shot_result:
+            asked_dot_to_shot = self.ask()
+            shot_result = self.enemy_board.shot(asked_dot_to_shot)
 
 
 class User(Player):
     def ask(self):
+        print(f"""
+Моя доска
+{self.player_board}
+
+Доска врага
+{self.enemy_board}
+\n
+        """)
         print("Введите координаты точки для выстрела через пробел")
         print('Например: --> 1 2 ')
         user_input = input("--> ").split()
-        return Dot(user_input[0] - 1, user_input[1] - 1)
+        return Dot(int(user_input[0]) - 1, int(user_input[1]) - 1)
 
 
 class AI(Player):
@@ -199,13 +211,30 @@ class Game:
 
 
     def greet(self):
-        pass
+        print("""
+╔══╗─╔═══╗╔════╗╔════╗╔╗───╔═══╗╔═══╗╔╗─╔╗╔══╗╔═══╗
+║╔╗║─║╔═╗║║╔╗╔╗║║╔╗╔╗║║║───║╔══╝║╔═╗║║║─║║╚╣─╝║╔═╗║
+║╚╝╚╗║║─║║╚╝║║╚╝╚╝║║╚╝║║───║╚══╗║╚══╗║╚═╝║─║║─║╚═╝║
+║╔═╗║║╚═╝║──║║────║║──║║─╔╗║╔══╝╚══╗║║╔═╗║─║║─║╔══╝
+║╚═╝║║╔═╗║──║║────║║──║╚═╝║║╚══╗║╚═╝║║║─║║╔╣─╗║║───
+╚═══╝╚╝─╚╝──╚╝────╚╝──╚═══╝╚═══╝╚═══╝╚╝─╚╝╚══╝╚╝───
+        """)
+        print("")
 
     def loop(self):
-        pass
-
+        who_move = 0
+        while self.user_board.alive_ships > 0 or self.ai_board.alive_ships > 0:
+            if who_move == 0:
+                self.user_player.move()
+                who_move = 1
+            elif who_move == 1:
+                self.ai_player.move()
+                who_move = 0
+        print("Игрок победил" if self.user_board.alive_ships > 0 and self.ai_board.alive_ships == 0 else "AI победил")
+    
     def start(self):
-        pass
+        self.greet()
+        self.loop()
 
         
 
@@ -241,10 +270,11 @@ class Game:
 # board.shot(Dot(0, 5))
 # print(board)
 
-game = Game()
+if __name__ == '__main__':
+    game = Game()
+    game.start()
 
-
-print(game.user_board)
+# print(game.user_board)
 # print(game.ai_board)
 
 
