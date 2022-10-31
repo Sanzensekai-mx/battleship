@@ -59,7 +59,7 @@ class Board:
         return not((self.board_size > dot.x >= 0) and (self.board_size > dot.y >= 0))
 
     def add_ship(self, ship: Ship):
-        print(ship.dots())
+        # print(ship.dots())
         for dot in ship.dots():
             if self.out(dot):
                 raise BoardShipException(f"Невозможно разместить корабль в точке: {dot.x} {dot.y + 1}" if ship.ship_direction == 'horizontally' 
@@ -73,7 +73,7 @@ class Board:
                 if dot == a_dot and self._board_dots[dot.x][dot.y] == '■':
                     raise BoardShipException(f"В этой точке уже стоит другой корабль: {dot.x} {dot.y + 1}" if ship.ship_direction == 'horizontally' 
                                             else f"В этой точке уже стоит другой корабль: {dot.x + 1} {dot.y}")
-                elif dot == a_dot and self._board_dots[dot.x][dot.y] == 'T':
+                elif dot == a_dot:
                     raise BoardShipException(f"В этой точке по правилам нельзя ставить корабль: {dot.x} {dot.y + 1}" if ship.ship_direction == 'horizontally' 
                                             else f"В этой точке по правилам нельзя ставить корабль: {dot.x + 1} {dot.y}")
 
@@ -183,10 +183,10 @@ class Game:
                                 ship_direction=direction)
                     try:
                         board.add_ship(cur_ship)
-                        board.contour(cur_ship, change_board_layout=True)
+                        board.contour(cur_ship)
                         break
                     except BoardShipException as e:
-                        print(e)
+                        # print(e)
                         count_try += 1
                         continue
                     
