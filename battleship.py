@@ -1,4 +1,5 @@
 import random
+from time import sleep
 
 
 class BoardShipException(Exception):
@@ -6,6 +7,9 @@ class BoardShipException(Exception):
 
 
 class BoardDotOutException(Exception):
+    pass
+
+class BoardShotException(Exception):
     pass
 
 
@@ -21,7 +25,7 @@ class Dot:
         return self.x == other.x and self.y == other.y
     
     def __repr__(self):
-        return f"{self.__class__}{self.x, self.y}"
+        return f"{self.x + 1, self.y + 1}"
 
 
 class Ship:
@@ -47,13 +51,14 @@ class Ship:
 
 class Board:
     def __init__(self, hid=False, board_size=6):
-        # self._board_dots = [[Dot(i, j) for j in range(1, board_size + 1)] for i in range(1, board_size + 1)]
         self._board_dots = [["O"] * board_size for i in range(board_size)]
         self.ship_list = [] # объекты Ships
         self.hid = hid
         self.board_size = board_size
         self.alive_ships = 0 # Количество живых кораблей на доске
         self.not_empty_dots = []
+        self.last_board_event = []
+        self.last_dot_event = None
 
     def out(self, dot):
         return not((self.board_size > dot.x >= 0) and (self.board_size > dot.y >= 0))
@@ -64,11 +69,6 @@ class Board:
             if self.out(dot):
                 raise BoardShipException(f"Невозможно разместить корабль в точке: {dot.x} {dot.y + 1}" if ship.ship_direction == 'horizontally' 
                                             else f"Невозможно разместить корабль в точке: {dot.x + 1} {dot.y}")
-            # for another_ship in self.ship_list:
-                # for a_dot in another_ship.dots(): # ИТЕРИРОВАТЬ НАДО ПО ВСЕМ ЗАНЯТЫМ, А НЕ ТОЛЬКО ПО КОРАБЛЯМ
-                    # if dot == a_dot:
-                        # raise BoardShipException(f"В этой точке уже стоит другой корабль: {dot.x} {dot.y + 1}" if ship.ship_direction == 'horizontally' 
-                                            # else f"В этой точке уже стоит другой корабль: {dot.x + 1} {dot.y}")
             for a_dot in self.not_empty_dots:
                 if dot == a_dot and self._board_dots[dot.x][dot.y] == '■':
                     raise BoardShipException(f"В этой точке уже стоит другой корабль: {dot.x} {dot.y + 1}" if ship.ship_direction == 'horizontally' 
@@ -80,13 +80,11 @@ class Board:
         for dot in ship.dots():
             self.not_empty_dots.append(dot)
             self._board_dots[dot.x][dot.y] = "■"
-            # self.not_empty_dots.append(dot) # BoardShipException при shoot
         self.ship_list.append(ship)
         self.alive_ships += 1
                 
 
     def contour(self, ship: Ship, change_board_layout=False):
-        # ship_contour = []
         # Использовать out, not_empty_dots
         for dot in ship.dots():
             near_dots = [Dot(dot.x + 1, dot.y), Dot(dot.x - 1, dot.y), Dot(dot.x, dot.y + 1),
@@ -95,34 +93,38 @@ class Board:
             for n_dot in near_dots:
                 if self.out(n_dot) or n_dot in ship.dots():
                     continue
-                if n_dot not in self.not_empty_dots:
-                    self.not_empty_dots.append(n_dot)
-                    if change_board_layout:
-                        self._board_dots[n_dot.x][n_dot.y] = 'T'
+                self.not_empty_dots.append(n_dot)
+                if change_board_layout:
+                    self._board_dots[n_dot.x][n_dot.y] = 'T'
 
     def shot(self, dot):
         if self.out(dot):
             raise BoardDotOutException()
-        # if dot in self.not_empty_dots:
-            # raise BoardShipException()
-        
+        if self._board_dots[dot.x][dot.y] in ('T', 'X'):
+            raise BoardShotException()
         self.not_empty_dots.append(dot)
         for ship in self.ship_list:
             if dot in ship.dots():
+                self.last_dot_event = dot
                 ship.lives -= 1
                 self._board_dots[dot.x][dot.y] = 'X'
                 if ship.lives == 0:
                     # Корабль уничтожен
                     self.contour(ship, change_board_layout=True)
                     self.alive_ships -= 1
-                    print('Корабль уничтожен!!!')
+                    # self.last_board_event = 'Корабль уничтожен!!!'
+                    self.last_board_event.append(('Корабль уничтожен!!!', dot))
                     return True
                 elif ship.lives > 0:
                     # ранен
-                    print('Ранен корабль!')
+                    self.last_board_event.append(('Ранен корабль!', dot))
+                    # self.last_board_event = 'Ранен корабль!'
                     return True
         # промах
         self._board_dots[dot.x][dot.y] = 'T'
+        # self.last_dot_event = dot
+        self.last_board_event.append(('Промах!', dot))
+        # self.last_board_event = 'Промах!'
         return False
 
     def __str__(self):
@@ -146,11 +148,28 @@ class Player:
         pass # Вернуть Dot объект
 
     def move(self):
-        asked_dot_to_shot = self.ask()
-        shot_result = self.enemy_board.shot(asked_dot_to_shot)
-        while shot_result:
+        # asked_dot_to_shot = self.ask()
+        shot_result = None
+        shot_not_valid = True
+        while shot_not_valid:
             asked_dot_to_shot = self.ask()
-            shot_result = self.enemy_board.shot(asked_dot_to_shot)
+            try:
+                shot_result = self.enemy_board.shot(asked_dot_to_shot)
+                shot_not_valid = False
+            except BoardShotException:
+                print('\n!!! Нельзя стрелять в уже подбитую клетку')
+                continue
+        while shot_result:
+            # asked_dot_to_shot = self.ask()
+            shot_not_valid = True
+            while shot_not_valid:
+                asked_dot_to_shot = self.ask()
+                try:
+                    shot_result = self.enemy_board.shot(asked_dot_to_shot)
+                    shot_not_valid = False
+                except BoardShotException:
+                    print('\n!!! Нельзя стрелять в уже подбитую клетку')
+                    continue
 
 
 class User(Player):
@@ -161,18 +180,46 @@ class User(Player):
 
 Доска врага
 {self.enemy_board}
-\n
-        """)
-        print("Введите координаты точки для выстрела через пробел")
-        print('Например: --> 1 2 ')
-        user_input = input("--> ").split()
-        return Dot(int(user_input[0]) - 1, int(user_input[1]) - 1)
+\n""")
+        while True:
+            # try:
+                # if self.enemy_board.last_board_event[-1][0] == 'Промах!':
+                #     self.enemy_board.last_board_event = [('Промах!', self.enemy_board.last_dot_event)]
+                # if self.player_board.last_board_event[-1][0] == 'Промах!':
+                    # self.player_board.last_board_event = [('Промах!', self.player_board.last_dot_event)]
+            # except IndexError:
+                # pass
+            try:
+                print(f"Результаты моего выстрела: {self.enemy_board.last_board_event}")
+                print(f"Результаты выстрела врага: {self.player_board.last_board_event}")
+                # print(f"Результаты моего выстрела: {self.enemy_board.last_board_event[-1]}")
+                # print(f"Результаты выстрела врага: {self.player_board.last_board_event[-1]}")
+            except IndexError:
+                pass
+            print("Введите координаты точки для выстрела через пробел")
+            print('Например: --> 1 2 ')
+            user_input = input("--> ").split()
+            try:
+                return Dot(int(user_input[0]) - 1, int(user_input[1]) - 1)
+            except IndexError:
+                print("Неправильный ввод")
+                continue
 
 
 class AI(Player):
     def ask(self):
-        random_dot = Dot(random.randint(0, 5), random.randint(0, 5))
-        return random_dot
+        print('Ход врага')
+        for i in ['.' for _ in range(3)]:
+            sleep(0.5)
+            print(i)
+        # !!! Дополнить алгоритм 
+        dot = self.player_board.last_board_event[-1][1]
+        if self.player_board.last_board_event[-1][0] == 'Ранен корабль!':
+            near_dots = [Dot(dot.x + 1, dot.y), Dot(dot.x - 1, dot.y), Dot(dot.x, dot.y + 1),
+                    Dot(dot.x, dot.y - 1), Dot(dot.x + 1, dot.y + 1), Dot(dot.x - 1, dot.y - 1),
+                    Dot(dot.x + 1, dot.y - 1), Dot(dot.x - 1 , dot.y + 1)]
+            return random.choice(near_dots)
+        return Dot(random.randint(0, 5), random.randint(0, 5))
 
 
 class Game:
@@ -238,58 +285,6 @@ class Game:
 
         
 
-# dot1 = Dot(0, 2)
-# dot2 = Dot(2, 3)
-
-# list_dots = [dot2, Dot(0, 5), Dot(5, 3)]
-
-
-# board = Board(hid=True)
-
-
-# ship1 = Ship(length=3, ship_bow=dot1, ship_direction='horizontally')
-# ship2 = Ship(length=2, ship_bow=dot2, ship_direction='vertically')
-
-
-
-
-# dot3 = Dot(2, 3)
-
-# ship3 = Ship(length=3, ship_bow=dot3, ship_direction='vertically')
-# print(ship3.dots())
-# board.add_ship(ship3)
-# print(board.not_empty_dots)
-
-# board.shot(Dot(1, 3))
-# board.shot(Dot(2, 3))
-
-# board.shot(Dot(3, 3))
-# board.shot(Dot(4, 3))
-
-# board.shot(Dot(1, 5))
-# board.shot(Dot(0, 5))
-# print(board)
-
 if __name__ == '__main__':
     game = Game()
     game.start()
-
-# print(game.user_board)
-# print(game.ai_board)
-
-
-# board = Board()
-
-# dot = Dot(4, 1)
-# dot = Dot(5, 5)
-
-# ship = Ship(length=3, ship_bow=dot, ship_direction='vertically')
-# ship = Ship(length=3, ship_bow=dot, ship_direction='horizontally')
-# print(ship.dots())
-
-# print(board.out(Dot(6, 5)))
-
-# board.add_ship(ship)
-# board.contour(ship, change_board_layout=True)
-
-# print(board)
